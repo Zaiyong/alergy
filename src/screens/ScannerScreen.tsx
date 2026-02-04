@@ -1,10 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Alert, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, ActivityIndicator, StyleSheet, Platform } from 'react-native';
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useAllergyProfile } from '../context/AllergyProfileContext';
 import { analyzeLabel, AnalysisError } from '../services/ai/geminiService';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+
+// Check if running on web platform - CameraView doesn't work well on web
+const isWeb = Platform.OS === 'web';
 
 type RootStackParamList = {
   AllergySetup: undefined;
@@ -15,11 +18,17 @@ type RootStackParamList = {
 type Props = NativeStackScreenProps<RootStackParamList, 'Scanner'>;
 
 export const ScannerScreen: React.FC<Props> = ({ navigation }) => {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/52570910-b74d-4299-a2e7-eb94fabce7bf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScannerScreen.tsx:17',message:'ScannerScreen component mounting',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
   const [permission, requestPermission] = useCameraPermissions();
   const [mediaLibraryPermission, requestMediaLibraryPermission] = ImagePicker.useMediaLibraryPermissions();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const cameraRef = useRef<CameraView>(null);
   const { selectedAllergenIds } = useAllergyProfile();
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/52570910-b74d-4299-a2e7-eb94fabce7bf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScannerScreen.tsx:24',message:'Hooks initialized',data:{hasPermission:!!permission,permissionGranted:permission?.granted,permissionCanAskAgain:permission?.canAskAgain},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
 
   // Request permission on mount
   useEffect(() => {
@@ -201,6 +210,9 @@ export const ScannerScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   if (!permission) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/52570910-b74d-4299-a2e7-eb94fabce7bf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScannerScreen.tsx:203',message:'Render: permission is null/undefined - showing loading',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
     // Permission status is still loading
     return (
       <View className="flex-1 items-center justify-center bg-black">
@@ -212,6 +224,9 @@ export const ScannerScreen: React.FC<Props> = ({ navigation }) => {
 
   // If camera permission is not granted, show option to use gallery or request camera permission
   if (!permission.granted) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/52570910-b74d-4299-a2e7-eb94fabce7bf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScannerScreen.tsx:216',message:'Render: permission not granted - showing gallery option',data:{permission},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
     return (
       <View className="flex-1 items-center justify-center bg-black px-4">
         <Text className="text-white text-xl font-bold mb-4 text-center">
@@ -235,6 +250,52 @@ export const ScannerScreen: React.FC<Props> = ({ navigation }) => {
             <Text className="text-white font-semibold">Grant Camera Permission</Text>
           </TouchableOpacity>
         </View>
+      </View>
+    );
+  }
+
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/52570910-b74d-4299-a2e7-eb94fabce7bf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScannerScreen.tsx:254',message:'Render: permission granted',data:{permission,isWeb},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
+
+  // On web, show upload-only UI since CameraView doesn't work well on web browsers
+  if (isWeb) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/52570910-b74d-4299-a2e7-eb94fabce7bf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScannerScreen.tsx:260',message:'Render: Web platform - showing upload-only UI',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    return (
+      <View className="flex-1 items-center justify-center bg-gray-900 px-4">
+        <Text className="text-white text-2xl font-bold mb-4 text-center">
+          Scan Ingredient Label
+        </Text>
+        <Text className="text-gray-300 text-center mb-8">
+          Upload an image of a food ingredient label to check for allergens.
+        </Text>
+        <TouchableOpacity
+          onPress={handlePickImage}
+          disabled={isAnalyzing}
+          className={`px-8 py-4 rounded-xl items-center ${
+            isAnalyzing ? 'bg-gray-600' : 'bg-blue-500'
+          }`}
+        >
+          {isAnalyzing ? (
+            <View className="flex-row items-center">
+              <ActivityIndicator size="small" color="#ffffff" />
+              <Text className="text-white font-semibold ml-2">Analyzing...</Text>
+            </View>
+          ) : (
+            <Text className="text-white text-lg font-semibold">Upload Image</Text>
+          )}
+        </TouchableOpacity>
+        <Text className="text-gray-400 text-sm mt-4 text-center">
+          For camera capture, use the mobile app
+        </Text>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          className="mt-6 px-4 py-2"
+        >
+          <Text className="text-blue-400 text-sm">← Back to Allergy Setup</Text>
+        </TouchableOpacity>
       </View>
     );
   }
