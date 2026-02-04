@@ -18,17 +18,11 @@ type RootStackParamList = {
 type Props = NativeStackScreenProps<RootStackParamList, 'Scanner'>;
 
 export const ScannerScreen: React.FC<Props> = ({ navigation }) => {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/52570910-b74d-4299-a2e7-eb94fabce7bf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScannerScreen.tsx:17',message:'ScannerScreen component mounting',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
   const [permission, requestPermission] = useCameraPermissions();
   const [mediaLibraryPermission, requestMediaLibraryPermission] = ImagePicker.useMediaLibraryPermissions();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const cameraRef = useRef<CameraView>(null);
   const { selectedAllergenIds } = useAllergyProfile();
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/52570910-b74d-4299-a2e7-eb94fabce7bf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScannerScreen.tsx:24',message:'Hooks initialized',data:{hasPermission:!!permission,permissionGranted:permission?.granted,permissionCanAskAgain:permission?.canAskAgain},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-  // #endregion
 
   // Request permission on mount
   useEffect(() => {
@@ -163,6 +157,9 @@ export const ScannerScreen: React.FC<Props> = ({ navigation }) => {
    * Handle image selection from gallery
    */
   const handlePickImage = async () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/52570910-b74d-4299-a2e7-eb94fabce7bf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScannerScreen.tsx:handlePickImage',message:'handlePickImage called',data:{isAnalyzing},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
     if (isAnalyzing) {
       return;
     }
@@ -209,10 +206,69 @@ export const ScannerScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  if (!permission) {
+  /**
+   * Handle taking a photo with the browser/device camera
+   * Works on mobile browsers through the browser's camera API
+   */
+  const handleTakePhoto = async () => {
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/52570910-b74d-4299-a2e7-eb94fabce7bf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScannerScreen.tsx:203',message:'Render: permission is null/undefined - showing loading',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7242/ingest/52570910-b74d-4299-a2e7-eb94fabce7bf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScannerScreen.tsx:handleTakePhoto',message:'handleTakePhoto called',data:{isAnalyzing},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
     // #endregion
+    if (isAnalyzing) {
+      return;
+    }
+
+    try {
+      // Request camera permission for web
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/52570910-b74d-4299-a2e7-eb94fabce7bf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScannerScreen.tsx:handleTakePhoto',message:'Requesting camera permission',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+      const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/52570910-b74d-4299-a2e7-eb94fabce7bf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScannerScreen.tsx:handleTakePhoto',message:'Camera permission result',data:{granted:cameraPermission.granted,status:cameraPermission.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+      if (!cameraPermission.granted) {
+        Alert.alert(
+          'Camera Permission Required',
+          'Camera access is required to take photos.'
+        );
+        return;
+      }
+
+      // Launch camera via ImagePicker (works on mobile browsers)
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/52570910-b74d-4299-a2e7-eb94fabce7bf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScannerScreen.tsx:handleTakePhoto',message:'Calling launchCameraAsync',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: false,
+        quality: 0.8,
+        base64: false,
+      });
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/52570910-b74d-4299-a2e7-eb94fabce7bf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScannerScreen.tsx:handleTakePhoto',message:'launchCameraAsync result',data:{canceled:result.canceled,assetsCount:result.assets?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+
+      if (result.canceled) {
+        return;
+      }
+
+      const imageUri = result.assets[0]?.uri;
+      if (!imageUri) {
+        throw new Error('Failed to capture photo');
+      }
+
+      await processImageForAnalysis(imageUri);
+    } catch (error) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/52570910-b74d-4299-a2e7-eb94fabce7bf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScannerScreen.tsx:handleTakePhoto',message:'Error in handleTakePhoto',data:{errorMessage:error instanceof Error?error.message:String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      if (error instanceof Error && !(error instanceof AnalysisError)) {
+        Alert.alert('Camera Error', error.message, [{ text: 'OK' }]);
+      }
+    }
+  };
+
+  if (!permission) {
     // Permission status is still loading
     return (
       <View className="flex-1 items-center justify-center bg-black">
@@ -224,9 +280,6 @@ export const ScannerScreen: React.FC<Props> = ({ navigation }) => {
 
   // If camera permission is not granted, show option to use gallery or request camera permission
   if (!permission.granted) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/52570910-b74d-4299-a2e7-eb94fabce7bf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScannerScreen.tsx:216',message:'Render: permission not granted - showing gallery option',data:{permission},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-    // #endregion
     return (
       <View className="flex-1 items-center justify-center bg-black px-4">
         <Text className="text-white text-xl font-bold mb-4 text-center">
@@ -254,41 +307,38 @@ export const ScannerScreen: React.FC<Props> = ({ navigation }) => {
     );
   }
 
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/52570910-b74d-4299-a2e7-eb94fabce7bf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScannerScreen.tsx:254',message:'Render: permission granted',data:{permission,isWeb},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
-
-  // On web, show upload-only UI since CameraView doesn't work well on web browsers
+  // On web, show simplified UI - expo-image-picker doesn't differentiate camera/gallery on web
   if (isWeb) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/52570910-b74d-4299-a2e7-eb94fabce7bf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScannerScreen.tsx:260',message:'Render: Web platform - showing upload-only UI',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     return (
       <View className="flex-1 items-center justify-center bg-gray-900 px-4">
         <Text className="text-white text-2xl font-bold mb-4 text-center">
           Scan Ingredient Label
         </Text>
         <Text className="text-gray-300 text-center mb-8">
-          Upload an image of a food ingredient label to check for allergens.
+          Select or capture an image of a food ingredient label to check for allergens.
         </Text>
-        <TouchableOpacity
-          onPress={handlePickImage}
-          disabled={isAnalyzing}
-          className={`px-8 py-4 rounded-xl items-center ${
-            isAnalyzing ? 'bg-gray-600' : 'bg-blue-500'
-          }`}
-        >
-          {isAnalyzing ? (
-            <View className="flex-row items-center">
-              <ActivityIndicator size="small" color="#ffffff" />
-              <Text className="text-white font-semibold ml-2">Analyzing...</Text>
-            </View>
-          ) : (
-            <Text className="text-white text-lg font-semibold">Upload Image</Text>
-          )}
-        </TouchableOpacity>
-        <Text className="text-gray-400 text-sm mt-4 text-center">
-          For camera capture, use the mobile app
+        
+        {isAnalyzing ? (
+          <View className="flex-row items-center px-8 py-4">
+            <ActivityIndicator size="small" color="#ffffff" />
+            <Text className="text-white font-semibold ml-2">Analyzing...</Text>
+          </View>
+        ) : (
+          <View className="w-full max-w-xs space-y-4">
+            {/* Single button that opens file picker - on mobile it may offer camera option */}
+            <TouchableOpacity
+              onPress={handlePickImage}
+              disabled={isAnalyzing}
+              className="bg-blue-500 px-8 py-4 rounded-xl items-center w-full"
+            >
+              <Text className="text-white text-lg font-semibold">📷 Select Image</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        
+        <Text className="text-gray-400 text-sm mt-6 text-center px-4">
+          On mobile devices, you may be able to choose between camera and gallery.
+          For the best camera experience, use the native mobile app.
         </Text>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
