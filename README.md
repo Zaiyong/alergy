@@ -1,4 +1,4 @@
-# EuroAllergy Guard
+# YumSafe
 
 A high-performance, EU-compliant AI Food Allergy Scanner built with React Native (Expo) and Google Gemini AI. Scan food ingredient labels in real-time or upload images to detect allergens and "May contain" warnings.
 

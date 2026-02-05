@@ -1,6 +1,6 @@
 # Vercel Deployment Guide
 
-This guide will help you deploy EuroAllergy Guard to Vercel.
+This guide will help you deploy YumSafe to Vercel.
 
 ## Prerequisites
 

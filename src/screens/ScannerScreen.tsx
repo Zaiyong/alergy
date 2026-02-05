@@ -12,6 +12,7 @@ import { AnimatedButton } from '../components/AnimatedButton';
 const isWeb = Platform.OS === 'web';
 
 type RootStackParamList = {
+  Welcome: undefined;
   AllergySetup: undefined;
   Scanner: undefined;
   Result: { result: unknown };
@@ -25,6 +26,7 @@ export const ScannerScreen: React.FC<Props> = ({ navigation }) => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const cameraRef = useRef<CameraView>(null);
   const { selectedAllergenIds } = useAllergyProfile();
+  const [lastFailedImage, setLastFailedImage] = useState<string | null>(null);
 
   // Request permission on mount
   useEffect(() => {
@@ -62,28 +64,38 @@ export const ScannerScreen: React.FC<Props> = ({ navigation }) => {
 
       // Step 4: Navigate to result screen
       navigation.navigate('Result', { result });
+      // Clear any previously failed image on success
+      setLastFailedImage(null);
     } catch (error) {
+      // Store the failed image for retry
+      setLastFailedImage(imageInput);
+      
       // Handle different error types with user-friendly messages
       let errorMessage = 'An error occurred while analyzing the label.';
       let errorTitle = 'Analysis Error';
+      let showRetry = false;
 
       if (error instanceof AnalysisError) {
         switch (error.code) {
           case 'BLURRY_IMAGE':
             errorTitle = 'Image Too Blurry';
             errorMessage = 'The image is too blurry to read ingredients. Please try again with a clearer shot.';
+            showRetry = true;
             break;
           case 'NO_INGREDIENTS':
             errorTitle = 'No Ingredients Found';
             errorMessage = 'Could not find any ingredients in the image. Please make sure the label is clearly visible.';
+            showRetry = true;
             break;
           case 'API_TIMEOUT':
             errorTitle = 'Request Timeout';
             errorMessage = 'The analysis took too long. Please check your internet connection and try again.';
+            showRetry = true;
             break;
           case 'API_ERROR':
             errorTitle = 'API Error';
-            errorMessage = `API error: ${error.message}. Please check your API key configuration.`;
+            errorMessage = `API error: ${error.message}. Please check your API key configuration or try again.`;
+            showRetry = true;
             break;
           case 'INVALID_IMAGE':
             errorTitle = 'Invalid Image';
@@ -91,12 +103,32 @@ export const ScannerScreen: React.FC<Props> = ({ navigation }) => {
             break;
           default:
             errorMessage = error.message;
+            showRetry = true;
         }
       } else if (error instanceof Error) {
         errorMessage = error.message;
+        showRetry = true;
       }
 
-      Alert.alert(errorTitle, errorMessage, [{ text: 'OK' }]);
+      // Show alert with retry option if applicable
+      if (showRetry) {
+        Alert.alert(
+          errorTitle,
+          errorMessage,
+          [
+            { text: 'OK', style: 'cancel' },
+            {
+              text: 'Try Again',
+              onPress: () => {
+                // Retry with the same image that failed
+                processImageForAnalysis(imageInput);
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert(errorTitle, errorMessage, [{ text: 'OK' }]);
+      }
     } finally {
       setIsAnalyzing(false);
     }
@@ -327,6 +359,21 @@ export const ScannerScreen: React.FC<Props> = ({ navigation }) => {
     );
   }
 
+  // Show loading screen when analyzing instead of camera
+  if (isAnalyzing) {
+    return (
+      <View className="flex-1 items-center justify-center" style={{ backgroundColor: '#FFF8F0' }}>
+        <ActivityIndicator size="large" color="#FF4D2D" />
+        <Text className="text-xl font-bold mt-6" style={{ color: '#FF4D2D' }}>
+          Analyzing Label...
+        </Text>
+        <Text className="text-base mt-2 text-center px-8" style={{ color: '#666' }}>
+          Please wait while we check for allergens
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <View className="flex-1 bg-black">
       <CameraView
@@ -346,53 +393,45 @@ export const ScannerScreen: React.FC<Props> = ({ navigation }) => {
         </View>
 
         {/* Action Buttons */}
-        <View className="flex-row items-center justify-center space-x-6">
-          {/* Upload from Gallery Button */}
-          <View className="items-center">
-            <AnimatedButton
-              onPress={handlePickImage}
-              disabled={isAnalyzing}
-              className="w-16 h-16 rounded-full items-center justify-center border-2"
-              style={{
-                backgroundColor: isAnalyzing ? '#666' : '#FF4D2D',
-                borderColor: isAnalyzing ? '#888' : '#FFC30B',
-              }}
-              accessibilityLabel="Upload from gallery"
-              accessibilityRole="button"
-              accessibilityState={{ disabled: isAnalyzing }}
-            >
-              {isAnalyzing ? (
-                <ActivityIndicator size="small" color="#ffffff" />
-              ) : (
-                <Text className="text-white text-xl font-bold">↑</Text>
-              )}
-            </AnimatedButton>
-            <Text className="text-white mt-2 text-xs text-center font-semibold">
-              Gallery
-            </Text>
-          </View>
-
-          {/* Capture Button */}
+        <View className="flex-row items-end justify-between w-full px-4">
+          {/* Capture Button - Left side */}
           <View className="items-center">
             <AnimatedButton
               onPress={handleCapture}
               disabled={isAnalyzing}
               className="w-20 h-20 rounded-full items-center justify-center"
               style={{
-                backgroundColor: isAnalyzing ? '#666' : '#FFC30B',
+                backgroundColor: '#FFC30B',
               }}
               accessibilityLabel="Capture photo"
               accessibilityRole="button"
               accessibilityState={{ disabled: isAnalyzing }}
             >
-              {isAnalyzing ? (
-                <ActivityIndicator size="large" color="#FF4D2D" />
-              ) : (
-                <View className="w-16 h-16 rounded-full border-4" style={{ borderColor: '#FF4D2D' }} />
-              )}
+              <View className="w-16 h-16 rounded-full border-4" style={{ borderColor: '#FF4D2D' }} />
             </AnimatedButton>
             <Text className="text-white mt-2 text-xs text-center font-semibold">
-              {isAnalyzing ? 'Analyzing...' : 'Capture'}
+              Capture
+            </Text>
+          </View>
+
+          {/* Upload from Gallery Button - Right side */}
+          <View className="items-center">
+            <AnimatedButton
+              onPress={handlePickImage}
+              disabled={isAnalyzing}
+              className="w-20 h-20 rounded-full items-center justify-center border-2"
+              style={{
+                backgroundColor: '#FF4D2D',
+                borderColor: '#FFC30B',
+              }}
+              accessibilityLabel="Upload from gallery"
+              accessibilityRole="button"
+              accessibilityState={{ disabled: isAnalyzing }}
+            >
+              <Text className="text-white text-xl font-bold">↑</Text>
+            </AnimatedButton>
+            <Text className="text-white mt-2 text-xs text-center font-semibold">
+              Gallery
             </Text>
           </View>
         </View>

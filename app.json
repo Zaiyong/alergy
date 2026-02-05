@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "EuroAllergy Guard",
-    "slug": "elergy",
+    "name": "YumSafe",
+    "slug": "yumsafe",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,14 +16,14 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.elergy.app"
+      "bundleIdentifier": "com.yumsafe.app"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.elergy.app",
+      "package": "com.yumsafe.app",
       "permissions": [
         "CAMERA"
       ]
@@ -36,13 +36,13 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow EuroAllergy Guard to access your camera to scan ingredient labels."
+          "cameraPermission": "Allow YumSafe to access your camera to scan ingredient labels."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow EuroAllergy Guard to access your photos to scan ingredient labels."
+          "photosPermission": "Allow YumSafe to access your photos to scan ingredient labels."
         }
       ]
     ]

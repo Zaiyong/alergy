@@ -1,10 +1,14 @@
 import React from 'react';
-import { View, Text, ScrollView } from 'react-native';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AnalysisResult } from '../services/ai/types';
 import { AnimatedButton } from '../components/AnimatedButton';
+import { AllergenTag } from '../components/AllergenTag';
 
 type RootStackParamList = {
+  Welcome: undefined;
   AllergySetup: undefined;
   Scanner: undefined;
   Result: { result: AnalysisResult | unknown };
@@ -12,17 +16,111 @@ type RootStackParamList = {
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Result'>;
 
+// Status configuration with soft backgrounds and high-contrast text
+const statusConfig = {
+  unsafe: {
+    bg: '#FFF5F5',      // Soft red background
+    iconColor: '#DC2626', // Dark red
+    textColor: '#991B1B', // Dark red text
+    icon: 'dangerous' as const,
+    label: 'Unsafe',
+  },
+  caution: {
+    bg: '#FFFBEB',      // Soft yellow background
+    iconColor: '#D97706', // Dark orange
+    textColor: '#92400E', // Dark orange text
+    icon: 'warning' as const,
+    label: 'Caution',
+  },
+  safe: {
+    bg: '#F0FDF4',      // Soft green background
+    iconColor: '#16A34A', // Green
+    textColor: '#166534', // Dark green text
+    icon: 'check-circle' as const,
+    label: 'Safe',
+  },
+};
+
+// Card shadow/elevation system
+const cardShadow = {
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.1,
+  shadowRadius: 8,
+  elevation: 3, // Android
+};
+
 /**
- * Placeholder Result Screen (Phase 1)
- * 
- * Phase 2 will implement:
- * - Traffic light UI (Red/Yellow/Green)
- * - Beautiful result cards
- * - Detailed explanations
- * - Multilingual support
+ * Parse explanation text to extract structured format
+ * Looks for patterns like "Swedish → English" or "Swedish: English"
  */
+const parseExplanation = (explanation: string): Array<{ swedish?: string; english: string; allergen?: string }> => {
+  // Try to find Swedish → English pattern
+  const arrowPattern = /([^→]+)→\s*([^→\n]+)/g;
+  const colonPattern = /([^:]+):\s*([^:\n]+)/g;
+  
+  const results: Array<{ swedish?: string; english: string; allergen?: string }> = [];
+  
+  // Try arrow pattern first
+  let match;
+  while ((match = arrowPattern.exec(explanation)) !== null) {
+    const swedish = match[1].trim();
+    const english = match[2].trim();
+    results.push({ swedish, english });
+  }
+  
+  // If no arrow matches, try colon pattern
+  if (results.length === 0) {
+    while ((match = colonPattern.exec(explanation)) !== null) {
+      const swedish = match[1].trim();
+      const english = match[2].trim();
+      results.push({ swedish, english });
+    }
+  }
+  
+  // If still no structured format found, split by sentences/paragraphs
+  if (results.length === 0) {
+    const sentences = explanation.split(/[.!?]\s+/).filter(s => s.trim().length > 0);
+    sentences.forEach(sentence => {
+      results.push({ english: sentence.trim() });
+    });
+  }
+  
+  return results;
+};
+
+/**
+ * Highlight allergen names in text
+ */
+const highlightAllergens = (text: string, allergens: string[]): React.ReactNode => {
+  if (allergens.length === 0) {
+    // Return wrapped in Text component to prevent "Text strings must be rendered within a <Text> component" error
+    return <Text style={{ color: '#666666' }}>{text}</Text>;
+  }
+  
+  const allergenLower = allergens.map(a => a.toLowerCase());
+  const words = text.split(/(\s+)/);
+  
+  return words.map((word, index) => {
+    const wordLower = word.toLowerCase().replace(/[.,;:!?]/g, '');
+    const isAllergen = allergenLower.some(allergen => 
+      wordLower.includes(allergen) || allergen.includes(wordLower)
+    );
+    
+    if (isAllergen) {
+      return (
+        <Text key={index} style={{ fontWeight: '700', color: '#DC2626' }}>
+          {word}
+        </Text>
+      );
+    }
+    return <Text key={index}>{word}</Text>;
+  });
+};
+
 export const ResultScreen: React.FC<Props> = ({ route, navigation }) => {
   const { result } = route.params;
+  const insets = useSafeAreaInsets();
 
   // Type guard for AnalysisResult
   const isAnalysisResult = (r: unknown): r is AnalysisResult => {
@@ -37,117 +135,212 @@ export const ResultScreen: React.FC<Props> = ({ route, navigation }) => {
   };
 
   const analysisResult = isAnalysisResult(result) ? result : null;
-
-  // Determine status color
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'unsafe':
-        return { bg: '#FF4D2D', text: '#FFFFFF', border: '#FF4D2D' };
-      case 'caution':
-        return { bg: '#FFC30B', text: '#000000', border: '#FFC30B' };
-      case 'safe':
-        return { bg: '#4CAF50', text: '#FFFFFF', border: '#4CAF50' };
-      default:
-        return { bg: '#FFF8F0', text: '#333', border: '#DDD' };
-    }
-  };
-
-  const statusColors = analysisResult ? getStatusColor(analysisResult.status) : null;
+  const statusInfo = analysisResult ? statusConfig[analysisResult.status] : null;
+  const parsedExplanation = analysisResult ? parseExplanation(analysisResult.explanation) : [];
 
   return (
     <View className="flex-1" style={{ backgroundColor: '#FFF8F0' }}>
-      <ScrollView className="flex-1 px-4 pt-12">
-        <Text className="text-4xl font-bold mb-4" style={{ color: '#FF4D2D' }}>
+      <ScrollView 
+        className="flex-1" 
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 32, paddingBottom: 100 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Screen Title */}
+        <Text className="text-3xl font-bold mb-8" style={{ color: '#1A1A1A' }}>
           Analysis Result
         </Text>
 
-        {analysisResult ? (
-          <View className="space-y-4">
-            {/* Status */}
-            <View className="p-5 rounded-doughy border-2" style={{ 
-              backgroundColor: statusColors?.bg || '#FFF8F0',
-              borderColor: statusColors?.border || '#DDD',
-            }}>
-              <Text className="text-sm mb-2 font-semibold" style={{ color: statusColors?.text || '#666' }}>
-                Status
-              </Text>
-              <Text className="text-3xl font-bold capitalize" style={{ color: statusColors?.text || '#333' }}>
-                {analysisResult.status}
-              </Text>
+        {analysisResult && statusInfo ? (
+          <View style={{ gap: 24 }}>
+            {/* Status Header - Elegant Warning Style */}
+            <View
+              style={[
+                styles.statusHeader,
+                {
+                  backgroundColor: statusInfo.bg,
+                  borderColor: statusInfo.iconColor + '20', // 20% opacity border
+                },
+                cardShadow,
+              ]}
+            >
+              <View style={styles.statusHeaderContent}>
+                <MaterialIcons
+                  name={statusInfo.icon}
+                  size={32}
+                  color={statusInfo.iconColor}
+                />
+                <View style={styles.statusTextContainer}>
+                  <Text className="text-sm font-semibold" style={{ color: statusInfo.textColor, opacity: 0.8 }}>
+                    Status
+                  </Text>
+                  <Text className="text-2xl font-bold capitalize" style={{ color: statusInfo.textColor }}>
+                    {statusInfo.label}
+                  </Text>
+                </View>
+              </View>
             </View>
 
-            {/* Detected Allergens */}
+            {/* Detected Allergens - Tags */}
             {analysisResult.allergens.length > 0 && (
-              <View className="p-5 rounded-doughy border-2" style={{ 
-                backgroundColor: '#FFFFFF',
-                borderColor: '#FF4D2D',
-              }}>
-                <Text className="text-base font-bold mb-3" style={{ color: '#FF4D2D' }}>
-                  ⚠️ Detected Allergens
+              <View style={[styles.card, cardShadow]}>
+                <Text className="text-lg font-bold mb-4" style={{ color: '#1A1A1A' }}>
+                  Detected Allergens
                 </Text>
-                {analysisResult.allergens.map((allergen, index) => (
-                  <Text key={index} className="text-base mb-1" style={{ color: '#FF4D2D' }}>
-                    • {allergen}
-                  </Text>
-                ))}
+                <View style={styles.tagsContainer}>
+                  {analysisResult.allergens.map((allergen, index) => (
+                    <AllergenTag
+                      key={index}
+                      allergen={allergen}
+                      variant="detected"
+                    />
+                  ))}
+                </View>
               </View>
             )}
 
-            {/* Precautionary Allergen Labelling */}
+            {/* Precautionary Allergen Labelling - Tags */}
             {analysisResult.pal.length > 0 && (
-              <View className="p-5 rounded-doughy border-2" style={{ 
-                backgroundColor: '#FFFFFF',
-                borderColor: '#FFC30B',
-              }}>
-                <Text className="text-base font-bold mb-3" style={{ color: '#FFC30B' }}>
-                  ⚠️ May Contain Warnings
+              <View style={[styles.card, cardShadow]}>
+                <Text className="text-lg font-bold mb-4" style={{ color: '#1A1A1A' }}>
+                  May Contain Warnings
                 </Text>
-                {analysisResult.pal.map((warning, index) => (
-                  <Text key={index} className="text-base mb-1" style={{ color: '#CC9900' }}>
-                    • {warning}
-                  </Text>
-                ))}
+                <View style={styles.tagsContainer}>
+                  {analysisResult.pal.map((warning, index) => (
+                    <AllergenTag
+                      key={index}
+                      allergen={warning}
+                      variant="pal"
+                    />
+                  ))}
+                </View>
               </View>
             )}
 
-            {/* Explanation */}
-            <View className="p-5 rounded-doughy border-2" style={{ 
-              backgroundColor: '#FFFFFF',
-              borderColor: '#DDD',
-            }}>
-              <Text className="text-base font-bold mb-3" style={{ color: '#333' }}>
-                📋 Explanation
+            {/* Explanation - Structured Comparison List */}
+            <View style={[styles.card, cardShadow]}>
+              <Text className="text-lg font-bold mb-4" style={{ color: '#1A1A1A' }}>
+                Explanation
               </Text>
-              <Text className="text-base leading-6" style={{ color: '#666' }}>
-                {analysisResult.explanation}
-              </Text>
+              <View style={styles.explanationContainer}>
+                {parsedExplanation.length > 0 ? (
+                  parsedExplanation.map((item, index) => (
+                    <View key={index} style={styles.explanationItem}>
+                      {item.swedish ? (
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' }}>
+                          <Text className="text-base font-bold" style={{ color: '#1A1A1A' }}>
+                            {item.swedish}
+                          </Text>
+                          <Text className="text-base" style={{ color: '#666666', marginHorizontal: 8 }}>
+                            →
+                          </Text>
+                          <View style={{ flex: 1, flexDirection: 'row', flexWrap: 'wrap' }}>
+                            {highlightAllergens(item.english, analysisResult.allergens)}
+                          </View>
+                        </View>
+                      ) : (
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                          {highlightAllergens(item.english, analysisResult.allergens)}
+                        </View>
+                      )}
+                    </View>
+                  ))
+                ) : (
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                    {highlightAllergens(analysisResult.explanation, analysisResult.allergens)}
+                  </View>
+                )}
+              </View>
             </View>
           </View>
         ) : (
-          <View className="p-5 rounded-doughy" style={{ backgroundColor: '#FFFFFF' }}>
-            <Text className="text-gray-700 font-semibold">
-              Raw result data (Phase 2 will have proper UI):
+          <View style={[styles.card, cardShadow]}>
+            <Text className="text-base font-semibold mb-2" style={{ color: '#666666' }}>
+              Raw result data:
             </Text>
-            <Text className="text-gray-600 mt-2 font-mono text-xs">
+            <Text className="text-sm font-mono" style={{ color: '#999999' }}>
               {JSON.stringify(result, null, 2)}
             </Text>
           </View>
         )}
-
-        <View className="h-8" />
       </ScrollView>
 
-      <View className="px-4 pb-8 pt-4" style={{ backgroundColor: '#FFF8F0', borderTopWidth: 1, borderTopColor: '#FFE5E0' }}>
+      {/* Floating CTA Button */}
+      <View
+        style={[
+          styles.floatingCTA,
+          {
+            paddingBottom: Math.max(insets.bottom, 16),
+            paddingHorizontal: 16,
+          },
+        ]}
+      >
         <AnimatedButton
           onPress={() => navigation.navigate('Scanner')}
-          className="py-5 rounded-doughy-lg items-center"
-          style={{ backgroundColor: '#FF4D2D' }}
+          className="items-center justify-center"
+          style={[
+            styles.ctaButton,
+            {
+              backgroundColor: '#FF4D2D',
+            },
+            cardShadow,
+          ]}
           accessibilityLabel="Scan another label"
           accessibilityRole="button"
         >
-          <Text className="text-white text-xl font-bold">Scan Another Label</Text>
+          <Text className="text-white text-lg font-semibold">Scan Another Label</Text>
         </AnimatedButton>
       </View>
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  statusHeader: {
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 24,
+  },
+  statusHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  statusTextContainer: {
+    flex: 1,
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+  },
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 4,
+  },
+  explanationContainer: {
+    gap: 12,
+  },
+  explanationItem: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'flex-start',
+  },
+  floatingCTA: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFF8F0',
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5E5',
+  },
+  ctaButton: {
+    borderRadius: 9999, // Full pill shape
+    paddingVertical: 16,
+    minHeight: 48,
+  },
+});

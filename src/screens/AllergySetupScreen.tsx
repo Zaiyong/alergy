@@ -1,11 +1,13 @@
-import React from 'react';
-import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
+import React, { useMemo } from 'react';
+import { View, Text, ScrollView, ActivityIndicator, Dimensions } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useAllergyProfile } from '../context/AllergyProfileContext';
-import { EU_ALLERGENS, AllergenId } from '../constants/allergens';
+import { EU_ALLERGENS, AllergenId, getAllergenIcon } from '../constants/allergens';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AnimatedButton } from '../components/AnimatedButton';
 
 type RootStackParamList = {
+  Welcome: undefined;
   AllergySetup: undefined;
   Scanner: undefined;
   Result: { result: unknown };
@@ -15,6 +17,19 @@ type Props = NativeStackScreenProps<RootStackParamList, 'AllergySetup'>;
 
 export const AllergySetupScreen: React.FC<Props> = ({ navigation }) => {
   const { selectedAllergenIds, toggleAllergen, isLoading } = useAllergyProfile();
+  
+  // Calculate card dimensions for uniform 2-column grid
+  const { cardWidth, gap } = useMemo(() => {
+    const screenWidth = Dimensions.get('window').width;
+    const padding = 32; // 16px on each side (px-4 = 16px)
+    const gapSize = 12;
+    const halfCardWidth = (screenWidth - padding - gapSize) / 2;
+    
+    return {
+      cardWidth: halfCardWidth,
+      gap: gapSize,
+    };
+  }, []);
 
   if (isLoading) {
     return (
@@ -39,43 +54,60 @@ export const AllergySetupScreen: React.FC<Props> = ({ navigation }) => {
           Select the allergens you need to avoid. This information stays on your device only.
         </Text>
 
-        <View className="space-y-2">
+        <View 
+          className="flex-row flex-wrap"
+          style={{ gap }}
+        >
           {EU_ALLERGENS.map((allergen) => {
             const isSelected = selectedAllergenIds.includes(allergen.id);
+            
             return (
               <AnimatedButton
                 key={allergen.id}
                 onPress={() => toggleAllergen(allergen.id)}
-                className={`flex-row items-center p-4 mb-3 rounded-doughy border-2 ${
+                className={`rounded-doughy border-2 ${
                   isSelected
                     ? 'border-tomato-red'
                     : 'border-gray-300'
                 }`}
                 style={{
                   backgroundColor: isSelected ? '#FF4D2D' : '#FFFFFF',
+                  width: cardWidth,
+                  minHeight: 100,
+                  padding: 16,
+                  position: 'relative',
                 }}
                 accessibilityLabel={`Toggle ${allergen.label.en}`}
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: isSelected }}
               >
-                <View
-                  className={`w-7 h-7 rounded-full border-2 mr-3 items-center justify-center ${
-                    isSelected
-                      ? 'bg-white border-white'
-                      : 'bg-white border-gray-400'
-                  }`}
-                >
-                  {isSelected && (
-                    <Text className="text-tomato-red text-sm font-bold">✓</Text>
-                  )}
+                {/* Checkmark indicator in top-right corner */}
+                {isSelected && (
+                  <View
+                    className="absolute top-2 right-2 w-6 h-6 rounded-full items-center justify-center"
+                    style={{ backgroundColor: 'rgba(255, 255, 255, 0.9)' }}
+                  >
+                    <Text className="text-tomato-red text-xs font-bold">✓</Text>
+                  </View>
+                )}
+                
+                {/* Vertical layout: icon on top, text below */}
+                <View className="flex-1 items-center justify-center">
+                  <MaterialIcons
+                    name={getAllergenIcon(allergen.id) as any}
+                    size={28}
+                    color={isSelected ? '#FFFFFF' : '#FF4D2D'}
+                    style={{ marginBottom: 8 }}
+                  />
+                  <Text
+                    className={`text-center text-sm font-semibold ${
+                      isSelected ? 'text-white' : 'text-gray-800'
+                    }`}
+                    numberOfLines={3}
+                  >
+                    {allergen.label.en}
+                  </Text>
                 </View>
-                <Text
-                  className={`flex-1 text-base font-semibold ${
-                    isSelected ? 'text-white' : 'text-gray-800'
-                  }`}
-                >
-                  {allergen.label.en}
-                </Text>
               </AnimatedButton>
             );
           })}

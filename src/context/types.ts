@@ -10,4 +10,4 @@ export interface AllergyProfile {
 /**
  * Storage key for AsyncStorage
  */
-export const ALLERGY_PROFILE_STORAGE_KEY = '@elergy:allergy_profile';
+export const ALLERGY_PROFILE_STORAGE_KEY = '@yumsafe:allergy_profile';

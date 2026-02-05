@@ -67,3 +67,31 @@ export const getAllergenLabel = (id: AllergenId): string => {
   const allergen = getAllergenById(id);
   return allergen?.label.en ?? id;
 };
+
+/**
+ * Icon mapping for allergens using MaterialIcons from @expo/vector-icons
+ * Maps each allergen ID to an appropriate icon name
+ */
+export const ALLERGEN_ICONS: Record<AllergenId, string> = {
+  gluten: 'grain', // Grain/wheat icon
+  crustaceans: 'set-meal', // Seafood/shrimp representation
+  eggs: 'breakfast-dining', // Egg/breakfast icon
+  fish: 'set-meal', // Fish/seafood icon
+  peanuts: 'circle', // Simple circle representing nut
+  soybeans: 'eco', // Bean/legume/plant icon
+  milk: 'local-cafe', // Milk/drink icon
+  tree_nuts: 'circle', // Nut representation
+  celery: 'eco', // Vegetable/plant icon
+  mustard: 'restaurant-menu', // Condiment/food icon
+  sesame: 'grain', // Seed/grain icon
+  sulphites: 'science', // Chemical/science icon
+  lupin: 'eco', // Legume/bean icon
+  molluscs: 'set-meal', // Shellfish/seafood icon
+};
+
+/**
+ * Get icon name for an allergen
+ */
+export const getAllergenIcon = (id: AllergenId): string => {
+  return ALLERGEN_ICONS[id] || 'help-outline';
+};

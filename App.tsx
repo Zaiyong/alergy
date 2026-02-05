@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { AllergyProfileProvider } from './src/context/AllergyProfileContext';
+import { WelcomeScreen } from './src/screens/WelcomeScreen';
 import { AllergySetupScreen } from './src/screens/AllergySetupScreen';
 import { ScannerScreen } from './src/screens/ScannerScreen';
 import { ResultScreen } from './src/screens/ResultScreen';
@@ -10,6 +11,7 @@ import './global.css';
 
 // Navigation types
 export type RootStackParamList = {
+  Welcome: undefined;
   AllergySetup: undefined;
   Scanner: undefined;
   Result: { result: unknown };
@@ -23,11 +25,12 @@ export default function App() {
       <NavigationContainer>
         <StatusBar style="auto" />
         <Stack.Navigator
-          initialRouteName="AllergySetup"
+          initialRouteName="Welcome"
           screenOptions={{
             headerShown: false, // Full-screen experience
           }}
         >
+          <Stack.Screen name="Welcome" component={WelcomeScreen} />
           <Stack.Screen name="AllergySetup" component={AllergySetupScreen} />
           <Stack.Screen name="Scanner" component={ScannerScreen} />
           <Stack.Screen name="Result" component={ResultScreen} />

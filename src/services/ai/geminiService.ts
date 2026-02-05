@@ -21,7 +21,7 @@ const API_TIMEOUT_MS = 30000; // 30 seconds timeout
 const MAX_IMAGE_SIZE_BYTES = 7 * 1024 * 1024;
 
 /**
- * System instruction for EuroAllergy Guard
+ * System instruction for YumSafe
  * 
  * This defines the AI's behavior:
  * - Analyzes ingredient labels in EN, DE, FR, ES
@@ -29,7 +29,7 @@ const MAX_IMAGE_SIZE_BYTES = 7 * 1024 * 1024;
  * - Detects bolded allergen names and "May contain" / PAL phrases
  * - Returns structured output for traffic light system
  */
-const SYSTEM_INSTRUCTION = `You are EuroAllergy Guard, an AI assistant that analyzes food ingredient labels for allergen detection according to EU Regulation 1169/2011 (Annex II).
+const SYSTEM_INSTRUCTION = `You are YumSafe, an AI assistant that analyzes food ingredient labels for allergen detection according to EU Regulation 1169/2011 (Annex II).
 
 Your task:
 1. Analyze the ingredient label image provided (may be in English, German, French, or Spanish).
@@ -236,9 +236,9 @@ export const analyzeLabel = async (
 
     const apiPromise = model.generateContent([prompt, imagePart]);
     const response = await Promise.race([apiPromise, timeoutPromise]);
-    const responseText = response.response.text();
 
-    // Step 7: Parse response to structured result
+    // Step 7: Extract and parse response
+    const responseText = response.response.text();
     return parseGeminiResponse(responseText);
 
   } catch (error) {
@@ -259,7 +259,7 @@ export const analyzeLabel = async (
       }
       
       // Check for rate limit errors (429)
-      if (error.message.includes('429') || error.message.includes('Resource exhausted') || error.message.includes('rate limit')) {
+      if (error.message.includes('429') || error.message.includes('Resource exhausted') || error.message.includes('rate limit') || error.message.includes('quota')) {
         throw new AnalysisError('API rate limit exceeded. Please wait a moment and try again.', 'API_ERROR');
       }
       
