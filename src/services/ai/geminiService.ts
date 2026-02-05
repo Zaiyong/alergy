@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { AllergenId } from '../../constants/allergens';
 import { getAllergenLabel } from '../../constants/allergens';
 import { AnalysisResult, AnalysisStatus, AnalysisError } from './types';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 /**
  * Gemini AI Service Configuration
@@ -80,8 +80,9 @@ const imageUriToBase64 = async (uri: string): Promise<string> => {
   try {
     // Read file as base64 using expo-file-system
     // This is specifically for Gemini API image input
+    // Use string literal 'base64' as EncodingType may be undefined in some versions
     const base64 = await FileSystem.readAsStringAsync(uri, {
-      encoding: FileSystem.EncodingType.Base64,
+      encoding: 'base64',
     });
 
     // Check file size
@@ -177,7 +178,6 @@ export const analyzeLabel = async (
 ): Promise<AnalysisResult> => {
   try {
     // Step 1: Convert image to base64 if it's a URI
-    // Image to base64 conversion for Gemini API
     let imageBase64: string;
     let mimeType = 'image/jpeg'; // Default, will be detected if possible
 
@@ -239,8 +239,7 @@ export const analyzeLabel = async (
     const responseText = response.response.text();
 
     // Step 7: Parse response to structured result
-    const parsedResult = parseGeminiResponse(responseText);
-    return parsedResult;
+    return parseGeminiResponse(responseText);
 
   } catch (error) {
     // Map various errors to AnalysisError
@@ -257,6 +256,11 @@ export const analyzeLabel = async (
       // Check for timeout or network errors
       if (error.message.includes('timeout') || error.message.includes('TIMEOUT')) {
         throw new AnalysisError('API request timed out', 'API_TIMEOUT');
+      }
+      
+      // Check for rate limit errors (429)
+      if (error.message.includes('429') || error.message.includes('Resource exhausted') || error.message.includes('rate limit')) {
+        throw new AnalysisError('API rate limit exceeded. Please wait a moment and try again.', 'API_ERROR');
       }
       
       // Check for API errors

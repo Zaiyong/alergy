@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Alert, ActivityIndicator, StyleSheet, Platform } from 'react-native';
-import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
+import { View, Text, Alert, ActivityIndicator, StyleSheet, Platform } from 'react-native';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useAllergyProfile } from '../context/AllergyProfileContext';
 import { analyzeLabel, AnalysisError } from '../services/ai/geminiService';
+import { resizeImageForAnalysis } from '../services/imageUtils';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { AnimatedButton } from '../components/AnimatedButton';
 
 // Check if running on web platform - CameraView doesn't work well on web
 const isWeb = Platform.OS === 'web';
@@ -38,8 +40,9 @@ export const ScannerScreen: React.FC<Props> = ({ navigation }) => {
   /**
    * Unified image processing function
    * Handles both camera photos (with base64) and gallery images (URI only)
+   * Now includes image resizing for optimal API processing
    */
-  const processImageForAnalysis = async (imageInput: string, base64?: string) => {
+  const processImageForAnalysis = async (imageInput: string) => {
     if (isAnalyzing) {
       return;
     }
@@ -47,13 +50,17 @@ export const ScannerScreen: React.FC<Props> = ({ navigation }) => {
     try {
       setIsAnalyzing(true);
 
-      // Prepare image input - use base64 if provided (from camera), otherwise use URI (from gallery)
-      const imageData = base64 || imageInput;
+      // Step 1: Resize the image for optimal API processing (max 1024px)
+      const resizedImage = await resizeImageForAnalysis(imageInput);
 
-      // Call Gemini AI service
+      // Step 2: Use the resized base64 for analysis
+      // Add data URI prefix so geminiService correctly identifies it as base64
+      const imageData = `data:image/jpeg;base64,${resizedImage.base64}`;
+
+      // Step 3: Call Gemini AI service
       const result = await analyzeLabel(imageData, selectedAllergenIds);
 
-      // Navigate to placeholder result screen (Phase 2 will have proper UI)
+      // Step 4: Navigate to result screen
       navigation.navigate('Result', { result });
     } catch (error) {
       // Handle different error types with user-friendly messages
@@ -115,23 +122,11 @@ export const ScannerScreen: React.FC<Props> = ({ navigation }) => {
       return;
     }
 
-    if (!permission?.granted) {
-      const result = await requestPermission();
-      if (!result.granted) {
-        Alert.alert(
-          'Camera Permission Required',
-          'Camera access is required to scan ingredient labels.'
-        );
-        return;
-      }
-    }
-
     try {
       // Take picture with base64 encoding for Gemini API
-      // Image to base64 conversion for Gemini API
       const photo = await cameraRef.current.takePictureAsync({
         base64: true,
-        quality: 0.8, // Balance between quality and file size
+        quality: 0.8,
         skipProcessing: false,
       });
 
@@ -139,14 +134,8 @@ export const ScannerScreen: React.FC<Props> = ({ navigation }) => {
         throw new Error('Failed to capture image');
       }
 
-      // Prepare image input (base64 from expo-camera)
-      // expo-camera returns base64 in the photo object if base64: true
-      const imageBase64 = photo.base64 || photo.uri;
-
-      // Process image using unified function
-      await processImageForAnalysis(photo.uri, imageBase64);
+      await processImageForAnalysis(photo.uri);
     } catch (error) {
-      // Error handling is done in processImageForAnalysis, but catch any unexpected errors here
       if (error instanceof Error && !(error instanceof AnalysisError)) {
         Alert.alert('Capture Error', error.message, [{ text: 'OK' }]);
       }
@@ -157,9 +146,6 @@ export const ScannerScreen: React.FC<Props> = ({ navigation }) => {
    * Handle image selection from gallery
    */
   const handlePickImage = async () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/52570910-b74d-4299-a2e7-eb94fabce7bf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScannerScreen.tsx:handlePickImage',message:'handlePickImage called',data:{isAnalyzing},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-    // #endregion
     if (isAnalyzing) {
       return;
     }
@@ -211,22 +197,12 @@ export const ScannerScreen: React.FC<Props> = ({ navigation }) => {
    * Works on mobile browsers through the browser's camera API
    */
   const handleTakePhoto = async () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/52570910-b74d-4299-a2e7-eb94fabce7bf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScannerScreen.tsx:handleTakePhoto',message:'handleTakePhoto called',data:{isAnalyzing},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-    // #endregion
     if (isAnalyzing) {
       return;
     }
 
     try {
-      // Request camera permission for web
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/52570910-b74d-4299-a2e7-eb94fabce7bf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScannerScreen.tsx:handleTakePhoto',message:'Requesting camera permission',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
       const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/52570910-b74d-4299-a2e7-eb94fabce7bf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScannerScreen.tsx:handleTakePhoto',message:'Camera permission result',data:{granted:cameraPermission.granted,status:cameraPermission.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
       if (!cameraPermission.granted) {
         Alert.alert(
           'Camera Permission Required',
@@ -235,18 +211,11 @@ export const ScannerScreen: React.FC<Props> = ({ navigation }) => {
         return;
       }
 
-      // Launch camera via ImagePicker (works on mobile browsers)
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/52570910-b74d-4299-a2e7-eb94fabce7bf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScannerScreen.tsx:handleTakePhoto',message:'Calling launchCameraAsync',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: false,
         quality: 0.8,
         base64: false,
       });
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/52570910-b74d-4299-a2e7-eb94fabce7bf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScannerScreen.tsx:handleTakePhoto',message:'launchCameraAsync result',data:{canceled:result.canceled,assetsCount:result.assets?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
 
       if (result.canceled) {
         return;
@@ -259,9 +228,6 @@ export const ScannerScreen: React.FC<Props> = ({ navigation }) => {
 
       await processImageForAnalysis(imageUri);
     } catch (error) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/52570910-b74d-4299-a2e7-eb94fabce7bf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScannerScreen.tsx:handleTakePhoto',message:'Error in handleTakePhoto',data:{errorMessage:error instanceof Error?error.message:String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       if (error instanceof Error && !(error instanceof AnalysisError)) {
         Alert.alert('Camera Error', error.message, [{ text: 'OK' }]);
       }
@@ -271,9 +237,9 @@ export const ScannerScreen: React.FC<Props> = ({ navigation }) => {
   if (!permission) {
     // Permission status is still loading
     return (
-      <View className="flex-1 items-center justify-center bg-black">
-        <ActivityIndicator size="large" color="#ffffff" />
-        <Text className="text-white mt-4">Checking camera permissions...</Text>
+      <View className="flex-1 items-center justify-center" style={{ backgroundColor: '#000' }}>
+        <ActivityIndicator size="large" color="#FF4D2D" />
+        <Text className="text-white mt-4 font-semibold">Checking camera permissions...</Text>
       </View>
     );
   }
@@ -281,27 +247,34 @@ export const ScannerScreen: React.FC<Props> = ({ navigation }) => {
   // If camera permission is not granted, show option to use gallery or request camera permission
   if (!permission.granted) {
     return (
-      <View className="flex-1 items-center justify-center bg-black px-4">
-        <Text className="text-white text-xl font-bold mb-4 text-center">
+      <View className="flex-1 items-center justify-center px-4" style={{ backgroundColor: '#000' }}>
+        <Text className="text-white text-2xl font-bold mb-4 text-center">
           Camera Permission Required
         </Text>
-        <Text className="text-white text-center mb-6">
+        <Text className="text-white text-center mb-8" style={{ color: '#CCC' }}>
           You can use your gallery to select an image, or grant camera access to take a photo.
         </Text>
-        <View className="w-full space-y-3">
-          <TouchableOpacity
+        <View className="w-full space-y-4">
+          <AnimatedButton
             onPress={handlePickImage}
             disabled={isAnalyzing}
-            className="bg-blue-500 px-6 py-3 rounded-lg items-center"
+            className="px-6 py-4 rounded-doughy items-center"
+            style={{ backgroundColor: '#FF4D2D' }}
+            accessibilityLabel="Upload from gallery"
+            accessibilityRole="button"
+            accessibilityState={{ disabled: isAnalyzing }}
           >
-            <Text className="text-white font-semibold">Upload from Gallery</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
+            <Text className="text-white text-lg font-bold">Upload from Gallery</Text>
+          </AnimatedButton>
+          <AnimatedButton
             onPress={requestPermission}
-            className="bg-gray-700 px-6 py-3 rounded-lg items-center"
+            className="px-6 py-4 rounded-doughy items-center"
+            style={{ backgroundColor: '#333' }}
+            accessibilityLabel="Grant camera permission"
+            accessibilityRole="button"
           >
-            <Text className="text-white font-semibold">Grant Camera Permission</Text>
-          </TouchableOpacity>
+            <Text className="text-white text-lg font-bold">Grant Camera Permission</Text>
+          </AnimatedButton>
         </View>
       </View>
     );
@@ -310,42 +283,46 @@ export const ScannerScreen: React.FC<Props> = ({ navigation }) => {
   // On web, show simplified UI - expo-image-picker doesn't differentiate camera/gallery on web
   if (isWeb) {
     return (
-      <View className="flex-1 items-center justify-center bg-gray-900 px-4">
-        <Text className="text-white text-2xl font-bold mb-4 text-center">
+      <View className="flex-1 items-center justify-center px-4" style={{ backgroundColor: '#1a1a1a' }}>
+        <Text className="text-white text-3xl font-bold mb-4 text-center">
           Scan Ingredient Label
         </Text>
-        <Text className="text-gray-300 text-center mb-8">
+        <Text className="text-center mb-8" style={{ color: '#CCC' }}>
           Select or capture an image of a food ingredient label to check for allergens.
         </Text>
         
         {isAnalyzing ? (
           <View className="flex-row items-center px-8 py-4">
-            <ActivityIndicator size="small" color="#ffffff" />
-            <Text className="text-white font-semibold ml-2">Analyzing...</Text>
+            <ActivityIndicator size="small" color="#FF4D2D" />
+            <Text className="text-white font-bold ml-2">Analyzing...</Text>
           </View>
         ) : (
           <View className="w-full max-w-xs space-y-4">
             {/* Single button that opens file picker - on mobile it may offer camera option */}
-            <TouchableOpacity
+            <AnimatedButton
               onPress={handlePickImage}
               disabled={isAnalyzing}
-              className="bg-blue-500 px-8 py-4 rounded-xl items-center w-full"
+              className="px-8 py-5 rounded-doughy-lg items-center w-full"
+              style={{ backgroundColor: '#FF4D2D' }}
+              accessibilityLabel="Select image"
+              accessibilityRole="button"
+              accessibilityState={{ disabled: isAnalyzing }}
             >
-              <Text className="text-white text-lg font-semibold">📷 Select Image</Text>
-            </TouchableOpacity>
+              <Text className="text-white text-xl font-bold">📷 Select Image</Text>
+            </AnimatedButton>
           </View>
         )}
         
-        <Text className="text-gray-400 text-sm mt-6 text-center px-4">
+        <Text className="text-sm mt-6 text-center px-4" style={{ color: '#999' }}>
           On mobile devices, you may be able to choose between camera and gallery.
           For the best camera experience, use the native mobile app.
         </Text>
-        <TouchableOpacity
+        <AnimatedButton
           onPress={() => navigation.goBack()}
           className="mt-6 px-4 py-2"
         >
-          <Text className="text-blue-400 text-sm">← Back to Allergy Setup</Text>
-        </TouchableOpacity>
+          <Text className="text-sm font-semibold" style={{ color: '#FFC30B' }}>← Back to Allergy Setup</Text>
+        </AnimatedButton>
       </View>
     );
   }
@@ -355,15 +332,15 @@ export const ScannerScreen: React.FC<Props> = ({ navigation }) => {
       <CameraView
         ref={cameraRef}
         style={StyleSheet.absoluteFill}
-        facing={CameraType.back}
+        facing="back"
         mode="picture"
       />
 
       {/* Overlay UI */}
       <View className="flex-1 justify-end pb-8 px-4">
         {/* Instructions */}
-        <View className="bg-black/60 rounded-lg p-4 mb-4">
-          <Text className="text-white text-center text-base">
+        <View className="rounded-doughy p-4 mb-4" style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)' }}>
+          <Text className="text-white text-center text-base font-semibold">
             Position the ingredient label in the frame or upload from gallery
           </Text>
         </View>
@@ -372,12 +349,14 @@ export const ScannerScreen: React.FC<Props> = ({ navigation }) => {
         <View className="flex-row items-center justify-center space-x-6">
           {/* Upload from Gallery Button */}
           <View className="items-center">
-            <TouchableOpacity
+            <AnimatedButton
               onPress={handlePickImage}
               disabled={isAnalyzing}
-              className={`w-16 h-16 rounded-full items-center justify-center border-2 ${
-                isAnalyzing ? 'bg-gray-500 border-gray-400' : 'bg-blue-500 border-blue-300'
-              }`}
+              className="w-16 h-16 rounded-full items-center justify-center border-2"
+              style={{
+                backgroundColor: isAnalyzing ? '#666' : '#FF4D2D',
+                borderColor: isAnalyzing ? '#888' : '#FFC30B',
+              }}
               accessibilityLabel="Upload from gallery"
               accessibilityRole="button"
               accessibilityState={{ disabled: isAnalyzing }}
@@ -387,31 +366,32 @@ export const ScannerScreen: React.FC<Props> = ({ navigation }) => {
               ) : (
                 <Text className="text-white text-xl font-bold">↑</Text>
               )}
-            </TouchableOpacity>
-            <Text className="text-white mt-2 text-xs text-center">
+            </AnimatedButton>
+            <Text className="text-white mt-2 text-xs text-center font-semibold">
               Gallery
             </Text>
           </View>
 
           {/* Capture Button */}
           <View className="items-center">
-            <TouchableOpacity
+            <AnimatedButton
               onPress={handleCapture}
               disabled={isAnalyzing}
-              className={`w-20 h-20 rounded-full items-center justify-center ${
-                isAnalyzing ? 'bg-gray-500' : 'bg-white'
-              }`}
+              className="w-20 h-20 rounded-full items-center justify-center"
+              style={{
+                backgroundColor: isAnalyzing ? '#666' : '#FFC30B',
+              }}
               accessibilityLabel="Capture photo"
               accessibilityRole="button"
               accessibilityState={{ disabled: isAnalyzing }}
             >
               {isAnalyzing ? (
-                <ActivityIndicator size="large" color="#3b82f6" />
+                <ActivityIndicator size="large" color="#FF4D2D" />
               ) : (
-                <View className="w-16 h-16 rounded-full border-4 border-gray-800" />
+                <View className="w-16 h-16 rounded-full border-4" style={{ borderColor: '#FF4D2D' }} />
               )}
-            </TouchableOpacity>
-            <Text className="text-white mt-2 text-xs text-center">
+            </AnimatedButton>
+            <Text className="text-white mt-2 text-xs text-center font-semibold">
               {isAnalyzing ? 'Analyzing...' : 'Capture'}
             </Text>
           </View>
